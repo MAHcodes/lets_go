@@ -2,29 +2,30 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
+	"crypto/rand"
 )
 
 func generatePassword(length int) string {
+	lower := "abcdefghijklmnopqrstuvwxyz"
+	upper := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	digits := "0123456789"
-	letters := "abcdefghijklmnopqrstuvwxyz"
 	symbols := "*!@#$?"
+	all := digits + lower + upper + symbols
 
-	all := digits + letters + symbols
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	var password string
-
-	for i := 0; i < length; i++ {
-		random_num := r.Intn(len(all))
-		password += all[random_num : random_num+1]
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		panic(err)
 	}
-	return password
+
+	for i, b := range bytes {
+		bytes[i] = all[int(b)%len(all)]
+	}
+
+	return string(bytes)
 }
 
 func main() {
-	pass := generatePassword(10)
+	pass := generatePassword(32)
 	fmt.Println(pass)
 }
