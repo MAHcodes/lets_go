@@ -7,16 +7,17 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-const url = "https://mah.codes"
-
 type model struct {
-	spinner spinner.Model
-	status  int
-	err     error
+	textInput textinput.Model
+	spinner   spinner.Model
+	loading   bool
+	status    int
+	err       error
 }
 
 type errMsg struct{ err error }
@@ -27,18 +28,29 @@ func initialModel() model {
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	return model{spinner: s}
+
+	ti := textinput.New()
+	ti.Placeholder = "example.com"
+	ti.Prompt = "Enter URL to check > https://"
+	ti.Focus()
+	ti.CharLimit = 156
+	ti.Width = 20
+
+	return model{
+		spinner:   s,
+		textInput: ti,
+	}
 }
 
-func checkServer() tea.Msg {
-	c := &http.Client{Timeout: 10 * time.Second}
-	res, err := c.Get(url)
-
-	if err != nil {
-		return errMsg{err}
+func checkServer(url string) tea.Cmd {
+	return func() tea.Msg {
+		c := &http.Client{Timeout: 10 * time.Second}
+		res, err := c.Get("https://" + url)
+		if err != nil {
+			return errMsg{err}
+		}
+		return statusMsg(res.StatusCode)
 	}
-
-	return statusMsg(res.StatusCode)
 }
 
 func (e errMsg) Error() string {
@@ -46,25 +58,46 @@ func (e errMsg) Error() string {
 }
 
 func (m model) Init() tea.Cmd {
-  return m.spinner.Tick
-	// return tea.Batch(checkServer, m.spinner.Tick)
+	return tea.Batch(textinput.Blink, m.spinner.Tick)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
+
 	case statusMsg:
+		fmt.Print("running")
 		m.status = int(msg)
+		m.loading = false
 		return m, tea.Quit
+
 	case errMsg:
+		fmt.Print("running")
 		m.err = msg
+		m.loading = false
 		return m, tea.Quit
+
 	case tea.KeyMsg:
 		switch msg.Type {
+
 		case tea.KeyCtrlC:
 			return m, tea.Quit
+
+		case tea.KeyEnter:
+			m.loading = true
+			m.textInput.Blur()
+			cmd := checkServer(m.textInput.Value())
+			return m, cmd
+
+		case tea.KeyEscape:
+			m.textInput.Focus()
+			m.loading = false
+		default:
+			m.textInput, cmd = m.textInput.Update(msg)
+			return m, cmd
 		}
+
 	default:
-		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	}
@@ -76,19 +109,25 @@ func (m model) View() string {
 		return fmt.Sprintf("\nwell guess what? we have some serious problems: %s\n", m.err)
 	}
 
-  spinner := m.spinner.View() + " "
-	if m.status > 0 {
-    spinner = ""
-  }
+	s := "\n"
+  quit := "\nPress ctrl+c to quit"
 
-
-	s := fmt.Sprintf("\n%sSending request to %s, please have a seat...\n", spinner, url)
-
-	if m.status > 0 {
-		s += fmt.Sprintf("%d: %s!\n", m.status, http.StatusText(m.status))
+	if m.loading {
+		s += fmt.Sprintf("%s Sending request to %s, please have a seat...\n", m.spinner.View(), m.textInput.Value())
+	} else if m.status > 0 {
+		s += fmt.Sprintf("%s -> %d: %s!\n", m.textInput.Value(), m.status, http.StatusText(m.status))
+    quit = ""
+	} else {
+		s += fmt.Sprintf("%s\n", m.textInput.View())
 	}
 
-	s += "\nPress ctrl+c to quit.\n"
+  s += quit
+
+	if m.loading {
+		s += " | Esc to cancel."
+	}
+
+	s += "\n"
 
 	return s
 }
