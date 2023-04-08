@@ -6,39 +6,100 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
+type keyMap struct {
+	Get  key.Binding
+	Help key.Binding
+	Quit key.Binding
+}
+
+type Styles struct {
+	BorderColor lipgloss.Color
+	Box         lipgloss.Style
+}
+
 type model struct {
 	textInput textinput.Model
 	spinner   spinner.Model
+	help      help.Model
+	keys      keyMap
 	loading   bool
 	status    int
 	err       error
+	width     int
+	height    int
+	styles    *Styles
 }
 
 type errMsg struct{ err error }
 
 type statusMsg int
 
-func initialModel() model {
+func DefaultStyles() *Styles {
+	s := new(Styles)
+	s.BorderColor = lipgloss.Color("205")
+	s.Box = lipgloss.NewStyle().
+		BorderForeground(s.BorderColor).
+		Padding(1).
+		BorderStyle(lipgloss.RoundedBorder()).
+		Width(70)
+	return s
+}
+
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Help}
+}
+
+func (k keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{k.Help},
+		{k.Get},
+		{k.Quit},
+	}
+}
+
+var keys = keyMap{
+	Get: key.NewBinding(
+		key.WithKeys(tea.KeyEnter.String()),
+		key.WithHelp("return", "Get url"),
+	),
+	Help: key.NewBinding(
+		key.WithKeys(tea.KeyCtrlH.String()),
+		key.WithHelp("ctrl+h", "Help"),
+	),
+	Quit: key.NewBinding(
+		key.WithKeys(tea.KeyCtrlC.String(), tea.KeyEsc.String()),
+		key.WithHelp("esc", "Quit"),
+	),
+}
+
+func initialModel() *model {
+	styles := DefaultStyles()
+
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	s.Style = lipgloss.NewStyle().Foreground(styles.BorderColor)
 
 	ti := textinput.New()
 	ti.Placeholder = "example.com"
-	ti.Prompt = "Enter URL to check > https://"
+	label := lipgloss.NewStyle().Foreground(styles.BorderColor)
+	ti.Prompt = label.Render("Enter URL  ") + "https://"
 	ti.Focus()
-	ti.CharLimit = 156
-	ti.Width = 20
+	ti.CharLimit = 150
 
-	return model{
+	return &model{
 		spinner:   s,
 		textInput: ti,
+		help:      help.New(),
+		keys:      keys,
+		styles:    styles,
 	}
 }
 
@@ -65,33 +126,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+
 	case statusMsg:
-		fmt.Print("running")
 		m.status = int(msg)
 		m.loading = false
-		return m, tea.Quit
 
 	case errMsg:
-		fmt.Print("running")
 		m.err = msg
 		m.loading = false
-		return m, tea.Quit
 
 	case tea.KeyMsg:
-		switch msg.Type {
+		switch {
 
-		case tea.KeyCtrlC:
+		case key.Matches(msg, m.keys.Help):
+			m.help.ShowAll = !m.help.ShowAll
+
+		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
 
-		case tea.KeyEnter:
+		case key.Matches(msg, m.keys.Get):
 			m.loading = true
 			m.textInput.Blur()
 			cmd := checkServer(m.textInput.Value())
 			return m, cmd
 
-		case tea.KeyEscape:
-			m.textInput.Focus()
-			m.loading = false
 		default:
 			m.textInput, cmd = m.textInput.Update(msg)
 			return m, cmd
@@ -106,34 +167,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	if m.err != nil {
-		return fmt.Sprintf("\nwell guess what? we have some serious problems: %s\n", m.err)
+		return fmt.Sprintf("\nwe have some serious problems: %s\n", m.err)
 	}
 
-	s := "\n"
-  quit := "\nPress ctrl+c to quit"
-
+	s := ""
 	if m.loading {
-		s += fmt.Sprintf("%s Sending request to %s, please have a seat...\n", m.spinner.View(), m.textInput.Value())
+		s += fmt.Sprintf("%s Sending request to %s, please have a seat...", m.spinner.View(), m.textInput.Value())
 	} else if m.status > 0 {
-		s += fmt.Sprintf("%s -> %d: %s!\n", m.textInput.Value(), m.status, http.StatusText(m.status))
-    quit = ""
+		s += fmt.Sprintf("%s -> %d: %s!", m.textInput.Value(), m.status, http.StatusText(m.status))
 	} else {
-		s += fmt.Sprintf("%s\n", m.textInput.View())
+		s += fmt.Sprintf("%s", m.textInput.View())
 	}
 
-  s += quit
+	box := m.styles.Box.Render(s)
+	help := m.help.View(m.keys)
 
-	if m.loading {
-		s += " | Esc to cancel."
-	}
+	app := lipgloss.JoinVertical(lipgloss.Center, box, help)
 
-	s += "\n"
-
-	return s
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Top, app)
 }
 
 func main() {
-	_, err := tea.NewProgram(initialModel()).Run()
+	_, err := tea.NewProgram(initialModel(), tea.WithAltScreen()).Run()
 	if err != nil {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)
