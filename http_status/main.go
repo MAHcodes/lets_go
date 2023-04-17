@@ -44,7 +44,7 @@ type statusMsg int
 
 func DefaultStyles() *Styles {
 	s := new(Styles)
-	s.BorderColor = lipgloss.Color("205")
+	s.BorderColor = lipgloss.Color("12")
 	s.Box = lipgloss.NewStyle().
 		BorderForeground(s.BorderColor).
 		Padding(1).
@@ -89,7 +89,7 @@ func initialModel() *model {
 
 	ti := textinput.New()
 	ti.Placeholder = "example.com"
-	label := lipgloss.NewStyle().Foreground(styles.BorderColor)
+	label := lipgloss.NewStyle().Foreground(styles.BorderColor).Bold(true)
 	ti.Prompt = label.Render("Enter URL  ") + "https://"
 	ti.Focus()
 	ti.CharLimit = 150
@@ -119,7 +119,7 @@ func (e errMsg) Error() string {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(textinput.Blink, m.spinner.Tick)
+	return tea.Batch(m.spinner.Tick, textinput.Blink)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -160,6 +160,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	default:
 		m.spinner, cmd = m.spinner.Update(msg)
+    m.textInput, cmd = m.textInput.Update(msg)
 		return m, cmd
 	}
 	return m, nil

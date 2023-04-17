@@ -59,7 +59,7 @@ func (m model) View() string {
 	for i, todo := range m.todos {
 		cursor := " "
 		if m.cursor == i {
-			cursor = ">"
+			cursor = ""
 		}
 
 		selected := " "
