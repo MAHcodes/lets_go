@@ -23,14 +23,17 @@ type Board struct {
 }
 
 type model struct {
-	cursor int
-	board  *Board
+	cursor      int
+	player1Turn bool
+	quitting    bool
+	board       *Board
 }
 
 var (
 	blue    = lg.Color("4")
 	yellow  = lg.Color("3")
 	red     = lg.Color("1")
+	black   = lg.Color("0")
 	boardBG = blue
 	p1Clr   = red
 	p2Clr   = yellow
@@ -50,7 +53,7 @@ func initModel() model {
 	for i := range b.cells {
 		b.cells[i] = make([]string, cols)
 		for j := range b.cells[i] {
-			cell := pieceStyle.Render(empty)
+			cell := pieceStyle.Foreground(black).Render(piece)
 			b.cells[i][j] = cell
 		}
 	}
@@ -65,18 +68,42 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) View() (s string) {
-	var col string
-	for i := range m.board.cells {
-		col = ""
-		for j := range m.board.cells[i] {
-			col = lg.JoinHorizontal(lg.Center, col, m.board.cells[i][j])
+	if m.quitting {
+		return ""
+	}
+
+	pieceToPlay := ""
+
+	if m.player1Turn {
+		pieceToPlay = lg.NewStyle().Foreground(red).Render(piece)
+	} else {
+		pieceToPlay = lg.NewStyle().Foreground(yellow).Render(piece)
+	}
+
+	s += fmt.Sprint(m.cursor, "\n")
+
+	for i := 1; i <= rows; i++ {
+		if m.cursor == i {
+			s += pieceToPlay
+		} else {
+			s += "   "
 		}
-		col = colStyle.Render(col)
-		s += col + "\n"
+	}
+	s = lg.NewStyle().Padding(0, 2).Render(s)
+	s += "\n"
+
+	var row string
+	for j := range m.board.cells[0] {
+		row = ""
+		for i := range m.board.cells {
+			row = lg.JoinHorizontal(lg.Center, row, m.board.cells[i][j])
+		}
+		row = colStyle.Render(row)
+		s += row + "\n"
 	}
 	t := lg.NewStyle().Foreground(boardBG).Render(triangle)
 	s += " " + t
-	end := lg.PlaceHorizontal(lg.Width(col)-3, lg.Right, t)
+	end := lg.PlaceHorizontal(lg.Width(row)-3, lg.Right, t)
 	s += end + "\n"
 
 	return s
@@ -88,11 +115,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
+			m.quitting = true
 			return m, tea.Quit
+		case "l", "right":
+			if m.cursor >= rows {
+				m.cursor = 1
+			} else {
+				m.cursor++
+			}
+		case "h", "left":
+			if m.cursor <= 1 {
+				m.cursor = rows
+			} else {
+				m.cursor--
+			}
 		}
 	}
 	return m, nil
 }
+
 func main() {
 	p := tea.NewProgram(initModel())
 	if _, err := p.Run(); err != nil {
