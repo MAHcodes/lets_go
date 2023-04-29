@@ -12,21 +12,20 @@ const (
 	cols     = 6
 	rows     = 7
 	piece    = ""
-	empty    = ""
 	triangle = "󰔶"
 )
 
 type Board struct {
-	cols  int
-	rows  int
-	cells [][]string
+	cols  uint8
+	rows  uint8
+	cells [][]uint8
 }
 
 type model struct {
-	cursor      int
-	player1Turn bool
-	quitting    bool
-	board       *Board
+	cursor   uint8
+	turn     uint8
+	quitting bool
+	board    *Board
 }
 
 var (
@@ -40,6 +39,7 @@ var (
 
 	colStyle = lg.NewStyle().
 			Padding(0, 1).
+			MarginLeft(1).
 			Background(boardBG)
 
 	pieceStyle = lg.NewStyle().
@@ -49,12 +49,11 @@ var (
 
 func initModel() model {
 	b := &Board{rows: rows, cols: cols}
-	b.cells = make([][]string, rows)
+	b.cells = make([][]uint8, rows)
 	for i := range b.cells {
-		b.cells[i] = make([]string, cols)
+		b.cells[i] = make([]uint8, cols)
 		for j := range b.cells[i] {
-			cell := pieceStyle.Foreground(black).Render(piece)
-			b.cells[i][j] = cell
+			b.cells[i][j] = 0
 		}
 	}
 	return model{
@@ -67,6 +66,17 @@ func (m model) Init() tea.Cmd {
 	return nil
 }
 
+func getPiece(value uint8) (s string) {
+	if value == 0 {
+		s = pieceStyle.Foreground(black).Render(piece)
+	} else if value == 1 {
+		s = pieceStyle.Foreground(red).Render(piece)
+	} else {
+		s = pieceStyle.Foreground(yellow).Render(piece)
+	}
+	return
+}
+
 func (m model) View() (s string) {
 	if m.quitting {
 		return ""
@@ -74,7 +84,7 @@ func (m model) View() (s string) {
 
 	pieceToPlay := ""
 
-	if m.player1Turn {
+	if m.turn == 1 {
 		pieceToPlay = lg.NewStyle().Foreground(red).Render(piece)
 	} else {
 		pieceToPlay = lg.NewStyle().Foreground(yellow).Render(piece)
@@ -82,21 +92,21 @@ func (m model) View() (s string) {
 
 	s += fmt.Sprint(m.cursor, "\n")
 
-	for i := 1; i <= rows; i++ {
+	for i := uint8(1); i <= rows; i++ {
 		if m.cursor == i {
 			s += pieceToPlay
 		} else {
 			s += "   "
 		}
 	}
-	s = lg.NewStyle().Padding(0, 2).Render(s)
+	s = lg.NewStyle().Padding(0, 2).MarginLeft(1).Render(s)
 	s += "\n"
 
 	var row string
 	for j := range m.board.cells[0] {
 		row = ""
 		for i := range m.board.cells {
-			row = lg.JoinHorizontal(lg.Center, row, m.board.cells[i][j])
+			row = lg.JoinHorizontal(lg.Center, row, getPiece(m.board.cells[i][j]))
 		}
 		row = colStyle.Render(row)
 		s += row + "\n"
@@ -114,21 +124,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
+
 		case "ctrl+c", "q":
 			m.quitting = true
 			return m, tea.Quit
+
 		case "l", "right":
 			if m.cursor >= rows {
 				m.cursor = 1
 			} else {
 				m.cursor++
 			}
+
 		case "h", "left":
 			if m.cursor <= 1 {
 				m.cursor = rows
 			} else {
 				m.cursor--
 			}
+
+		case "space", "enter":
+			return m, nil
 		}
 	}
 	return m, nil
