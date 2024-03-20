@@ -24,6 +24,7 @@ type Board struct {
 type model struct {
 	cursor   uint8
 	turn     uint8
+	winner   uint8
 	quitting bool
 	board    *Board
 }
@@ -57,6 +58,7 @@ func initModel() model {
 		}
 	}
 	return model{
+		turn:   1,
 		cursor: 1,
 		board:  b,
 	}
@@ -67,12 +69,12 @@ func (m model) Init() tea.Cmd {
 }
 
 func getPiece(value uint8) (s string) {
-	if value == 0 {
-		s = pieceStyle.Foreground(black).Render(piece)
-	} else if value == 1 {
+	if value == 1 {
 		s = pieceStyle.Foreground(red).Render(piece)
-	} else {
+	} else if value == 2 {
 		s = pieceStyle.Foreground(yellow).Render(piece)
+	} else {
+		s = pieceStyle.Foreground(black).Render(piece)
 	}
 	return
 }
@@ -82,6 +84,12 @@ func (m model) View() (s string) {
 		return ""
 	}
 
+	if m.winner != 0 {
+		return fmt.Sprintf("Player %d win", m.winner)
+	}
+
+	s += fmt.Sprint(m.winner, "\n")
+
 	pieceToPlay := ""
 
 	if m.turn == 1 {
@@ -89,8 +97,6 @@ func (m model) View() (s string) {
 	} else {
 		pieceToPlay = lg.NewStyle().Foreground(yellow).Render(piece)
 	}
-
-	s += fmt.Sprint(m.cursor, "\n")
 
 	for i := uint8(1); i <= rows; i++ {
 		if m.cursor == i {
@@ -143,8 +149,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor--
 			}
 
-		case "space", "enter":
-			return m, nil
+		case " ", "enter":
+			col := m.board.cells[m.cursor-1]
+			if col[0] != 0 {
+				return m, nil
+			}
+
+			if col[cols-1] == 0 {
+				col[cols-1] = m.turn
+			} else {
+				for j := range col {
+					if col[j] != 0 {
+						col[j-1] = m.turn
+						break
+					}
+				}
+			}
+			if m.turn == 1 {
+				m.turn = 2
+			} else {
+				m.turn = 1
+			}
 		}
 	}
 	return m, nil

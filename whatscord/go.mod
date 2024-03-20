@@ -1,4 +1,4 @@
-module github.com/MAHcodes/whatscord
+module github.com/MAHcodes/lets_go/whatscord
 
 go 1.20
 

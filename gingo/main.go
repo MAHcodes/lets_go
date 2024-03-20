@@ -19,5 +19,5 @@ func main() {
 	r.PUT("/user/:id", controllers.UpdateUser)
 	r.DELETE("/user/:id", controllers.DeleteUser)
 
-	r.Run()
+  r.Run(":5050")
 }
