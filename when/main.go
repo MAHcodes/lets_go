@@ -98,6 +98,10 @@ func handleCmd(cmd Command) string {
 		return getTime(cmd)
 	case NextCmd:
 		return next()
+	case AllCmd:
+		return all()
+	case VersionCmd:
+		return version()
 	default:
 		return help()
 	}
@@ -125,42 +129,54 @@ type Prayer struct {
 }
 
 func (p Prayer) String() string {
-	return fmt.Sprintf("%s: %s", p.Name, p.When)
+	return fmt.Sprintf(" %-9s: %s", p.Name, p.When)
 }
 
 func next() string {
 	prayer, err := fetchPrayer()
 	handle(err)
-
 	currentTime := time.Now()
-
 	nextPrayerDuration := 86400
-
 	v := reflect.ValueOf(*prayer)
 	t := v.Type()
 
 	var nextPrayer Prayer
-
 	for i := 0; i < v.NumField(); i++ {
 		prayName := t.Field(i).Name
 		prayTime := v.Field(i).String()
 		timeDiff := int(parseTime(prayTime).Sub(currentTime).Seconds())
 
-		if positive(timeDiff) && timeDiff <= nextPrayerDuration {
+		if timeDiff <= nextPrayerDuration {
 			nextPrayerDuration = timeDiff
 			nextPrayer = Prayer{
 				Name: prayName,
 				When: prayTime,
 			}
 		}
-
 	}
-
 	return nextPrayer.String()
 }
 
-func positive(n int) bool {
-	return n >= 0
+func all() (s string) {
+	prayer, err := fetchPrayer()
+	handle(err)
+	v := reflect.ValueOf(*prayer)
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		prayName := t.Field(i).Name
+		prayTime := v.Field(i).String()
+		p := Prayer{
+			Name: prayName,
+			When: prayTime,
+		}
+		s += fmt.Sprintf("%s\n", p.String())
+	}
+	return s
+}
+
+func version() string {
+	return "v0.0.1"
 }
 
 func main() {
