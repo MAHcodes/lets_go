@@ -97,8 +97,7 @@ func handleCmd(cmd Command) string {
 	case EmsakCmd, FajerCmd, ShorookCmd, DohorCmd, AserCmd, MoghrebCmd, IshaaCmd, MidnightCmd:
 		return getTime(cmd)
 	case NextCmd:
-		next()
-		return ""
+		return next()
 	default:
 		return help()
 	}
@@ -115,7 +114,9 @@ func help() string {
 func parseTime(prayerTime string) time.Time {
 	t, err := time.Parse("15:04", prayerTime)
 	handle(err)
-	return t
+
+	year, month, day := time.Now().Date()
+	return time.Date(year, month, day, t.Hour(), t.Minute(), 0, 0, time.Local)
 }
 
 type Prayer struct {
@@ -141,20 +142,25 @@ func next() string {
 	var nextPrayer Prayer
 
 	for i := 0; i < v.NumField(); i++ {
-		fieldTime := v.Field(i).String()
-		timeDiff := currentTime.Sub(parseTime(fieldTime))
-    fmt.Println("time diff: ", timeDiff.Seconds())
-    fmt.Println(int(timeDiff.Seconds()), nextPrayerDuration)
-		if int(timeDiff.Seconds()) <= nextPrayerDuration {
-			nextPrayerDuration = int(timeDiff)
+		prayName := t.Field(i).Name
+		prayTime := v.Field(i).String()
+		timeDiff := int(parseTime(prayTime).Sub(currentTime).Seconds())
+
+		if positive(timeDiff) && timeDiff <= nextPrayerDuration {
+			nextPrayerDuration = timeDiff
 			nextPrayer = Prayer{
-				Name: t.Field(i).Name,
-				When: fieldTime,
+				Name: prayName,
+				When: prayTime,
 			}
 		}
+
 	}
 
 	return nextPrayer.String()
+}
+
+func positive(n int) bool {
+	return n >= 0
 }
 
 func main() {
