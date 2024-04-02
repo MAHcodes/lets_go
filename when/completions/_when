@@ -1,0 +1,18 @@
+#compdef when
+
+local -a subcmds=(
+  "help"
+  "version"
+  "next"
+  "all"
+  "emsak"
+  "fajer"
+  "shorook"
+  "dohor"
+  "aser"
+  "moghreb"
+  "ishaa"
+  "midnight"
+)
+
+_describe 'when' subcmds

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -26,6 +27,7 @@ type Command string
 const (
 	HelpCmd     Command = "help"
 	VersionCmd  Command = "version"
+	CompleteCmd Command = "complete"
 	NextCmd     Command = "next"
 	AllCmd      Command = "all"
 	EmsakCmd    Command = "emsak"
@@ -38,7 +40,7 @@ const (
 	MidnightCmd Command = "midnight"
 )
 
-var commands = []Command{HelpCmd, VersionCmd, NextCmd, AllCmd, EmsakCmd, FajerCmd, ShorookCmd, DohorCmd, AserCmd, MoghrebCmd, IshaaCmd, MidnightCmd}
+var commands = []Command{HelpCmd, VersionCmd, CompleteCmd, NextCmd, AllCmd, EmsakCmd, FajerCmd, ShorookCmd, DohorCmd, AserCmd, MoghrebCmd, IshaaCmd, MidnightCmd}
 
 const Endpoint = "https://almanar.com.lb/ajax/prayer-times.php"
 
@@ -102,6 +104,8 @@ func handleCmd(cmd Command) string {
 		return all()
 	case VersionCmd:
 		return version()
+	case CompleteCmd:
+		return complete()
 	default:
 		return help()
 	}
@@ -132,6 +136,10 @@ func (p Prayer) String() string {
 	return fmt.Sprintf(" %-9s: %s", p.Name, p.When)
 }
 
+func (p Prayer) isEmpty() bool {
+	return p == Prayer{}
+}
+
 func next() string {
 	prayer, err := fetchPrayer()
 	handle(err)
@@ -141,19 +149,28 @@ func next() string {
 	t := v.Type()
 
 	var nextPrayer Prayer
+
 	for i := 0; i < v.NumField(); i++ {
 		prayName := t.Field(i).Name
 		prayTime := v.Field(i).String()
 		timeDiff := int(parseTime(prayTime).Sub(currentTime).Seconds())
 
-		if timeDiff <= nextPrayerDuration {
+		if timeDiff >= 0 && timeDiff <= nextPrayerDuration {
 			nextPrayerDuration = timeDiff
 			nextPrayer = Prayer{
 				Name: prayName,
 				When: prayTime,
 			}
 		}
+
+		if i == v.NumField()-1 && nextPrayer.isEmpty() {
+			nextPrayer = Prayer{
+				Name: prayName,
+				When: prayTime,
+			}
+		}
 	}
+
 	return nextPrayer.String()
 }
 
@@ -177,6 +194,13 @@ func all() (s string) {
 
 func version() string {
 	return "v0.0.1"
+}
+
+func complete() string {
+	var cmpl []string
+	cmpl = append(cmpl, "help", "version", "next", "all", "emsak", "fajer", "shorook", "dohor", "aser", "moghreb", "ishaa", "midnight")
+	return fmt.Sprintf("#compdef %s\n\n_arguments -s \\\n%s\n\n",
+		"when", strings.Join(cmpl, " "))
 }
 
 func main() {
