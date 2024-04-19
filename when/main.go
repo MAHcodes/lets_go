@@ -6,9 +6,14 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/signal"
 	"reflect"
 	"strings"
+	"syscall"
 	"time"
+
+	_ "github.com/gopxl/beep"
+	"github.com/robfig/cron"
 )
 
 type Prayers struct {
@@ -28,6 +33,7 @@ const (
 	HelpCmd     Command = "help"
 	VersionCmd  Command = "version"
 	CompleteCmd Command = "complete"
+	AlarmCmd    Command = "alarm"
 	NextCmd     Command = "next"
 	AllCmd      Command = "all"
 	EmsakCmd    Command = "emsak"
@@ -40,7 +46,7 @@ const (
 	MidnightCmd Command = "midnight"
 )
 
-var commands = []Command{HelpCmd, VersionCmd, CompleteCmd, NextCmd, AllCmd, EmsakCmd, FajerCmd, ShorookCmd, DohorCmd, AserCmd, MoghrebCmd, IshaaCmd, MidnightCmd}
+var commands = []Command{HelpCmd, VersionCmd, CompleteCmd, AlarmCmd, NextCmd, AllCmd, EmsakCmd, FajerCmd, ShorookCmd, DohorCmd, AserCmd, MoghrebCmd, IshaaCmd, MidnightCmd}
 
 const Endpoint = "https://almanar.com.lb/ajax/prayer-times.php"
 
@@ -99,7 +105,9 @@ func handleCmd(cmd Command) string {
 	case EmsakCmd, FajerCmd, ShorookCmd, DohorCmd, AserCmd, MoghrebCmd, IshaaCmd, MidnightCmd:
 		return getTime(cmd)
 	case NextCmd:
-		return next()
+		return next().String()
+	case AlarmCmd:
+		return alarmNext()
 	case AllCmd:
 		return all()
 	case VersionCmd:
@@ -140,7 +148,7 @@ func (p Prayer) isEmpty() bool {
 	return p == Prayer{}
 }
 
-func next() string {
+func next() Prayer {
 	prayer, err := fetchPrayer()
 	handle(err)
 	currentTime := time.Now()
@@ -171,7 +179,7 @@ func next() string {
 		}
 	}
 
-	return nextPrayer.String()
+	return nextPrayer
 }
 
 func all() (s string) {
@@ -194,6 +202,48 @@ func all() (s string) {
 
 func version() string {
 	return "v0.0.1"
+}
+
+func playAzan() {
+	azanPath := "~/Music/azan.mp3"
+	_, err := os.Open(azanPath)
+	handle(err)
+  // TODO:
+}
+
+func alarmNext() string {
+	c := cron.New()
+	prayer, err := fetchPrayer()
+	handle(err)
+
+  fajer := strings.Split(prayer.Fajer, ":")
+  dohor := strings.Split(prayer.Dohor, ":")
+  ishaa := strings.Split(prayer.Ishaa, ":")
+
+  c.AddFunc(fmt.Sprintf("%s %s * * * *", fajer[0], fajer[1]), playAzan)
+  fmt.Printf("[NEW ALARM] %s %s * * * *\n", fajer[0], fajer[1])
+
+  c.AddFunc(fmt.Sprintf("%s %s * * * *", dohor[0], dohor[1]), playAzan)
+  fmt.Printf("[NEW ALARM] %s %s * * * *\n", dohor[0], dohor[1])
+
+  c.AddFunc(fmt.Sprintf("%s %s * * * *", ishaa[0], ishaa[1]), playAzan)
+  fmt.Printf("[NEW ALARM] %s %s * * * *\n", ishaa[0], ishaa[1])
+
+  c.AddFunc("0 0 * * * *", func() {
+    fmt.Println("[RESTETTING]")
+    c.Stop()
+    alarmNext()
+  })
+
+	c.Start()
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
+	<-signalChan
+
+	c.Stop()
+
+	return "\n[ALARMS STOPPED]\n"
 }
 
 func complete() string {
