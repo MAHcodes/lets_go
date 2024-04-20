@@ -212,7 +212,7 @@ func playAzan() {
 	streamer, format, err := mp3.Decode(f)
 	handle(err)
 	defer streamer.Close()
-  speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 
 	done := make(chan bool)
 	speaker.Play(beep.Seq(streamer, beep.Callback(func() {
@@ -228,22 +228,26 @@ func log(scope, msg string) {
 
 func alarmNext() string {
 	c := cron.New()
+
 	prayer, err := fetchPrayer()
 	handle(err)
 
 	fajer := strings.Split(prayer.Fajer, ":")
-	c.AddFunc(fmt.Sprintf("%s %s * * * *", fajer[0], fajer[1]), playAzan)
+	err = c.AddFunc(fmt.Sprintf("%s %s * * * *", fajer[0], fajer[1]), playAzan)
+	handle(err)
 	log("new alarm|fajer", fmt.Sprintf("%s %s * * * *", fajer[0], fajer[1]))
 
 	dohor := strings.Split(prayer.Dohor, ":")
-	c.AddFunc(fmt.Sprintf("%s %s * * * *", dohor[0], dohor[1]), playAzan)
+	err = c.AddFunc(fmt.Sprintf("%s %s * * * *", dohor[0], dohor[1]), playAzan)
+	handle(err)
 	log("new alarm|dohor", fmt.Sprintf("%s %s * * * *", dohor[0], dohor[1]))
 
 	moghreb := strings.Split(prayer.Moghreb, ":")
-	c.AddFunc(fmt.Sprintf("%s %s * * * *", moghreb[0], moghreb[1]), playAzan)
+	err = c.AddFunc(fmt.Sprintf("%s %s * * * *", moghreb[0], moghreb[1]), playAzan)
+	handle(err)
 	log("new alarm|moghreb", fmt.Sprintf("%s %s * * * *", moghreb[0], moghreb[1]))
 
-	c.AddFunc("0 0 * * * *", func() {
+	c.AddFunc("0 0 0 * * *", func() {
 		log("RESTETTING", "")
 		c.Stop()
 		alarmNext()
