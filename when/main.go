@@ -12,7 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/gopxl/beep"
+	"github.com/gopxl/beep"
+	"github.com/gopxl/beep/mp3"
+	"github.com/gopxl/beep/speaker"
 	"github.com/robfig/cron"
 )
 
@@ -205,10 +207,23 @@ func version() string {
 }
 
 func playAzan() {
-	azanPath := "~/Music/azan.mp3"
-	_, err := os.Open(azanPath)
+	f, err := os.Open("/home/mhmdali102/Music/azan.mp3")
 	handle(err)
-  // TODO:
+	streamer, format, err := mp3.Decode(f)
+	handle(err)
+	defer streamer.Close()
+  speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+
+	done := make(chan bool)
+	speaker.Play(beep.Seq(streamer, beep.Callback(func() {
+		done <- true
+	})))
+
+	<-done
+}
+
+func log(scope, msg string) {
+	fmt.Printf("[%s] %s\n", strings.ToUpper(scope), msg)
 }
 
 func alarmNext() string {
@@ -216,24 +231,23 @@ func alarmNext() string {
 	prayer, err := fetchPrayer()
 	handle(err)
 
-  fajer := strings.Split(prayer.Fajer, ":")
-  dohor := strings.Split(prayer.Dohor, ":")
-  ishaa := strings.Split(prayer.Ishaa, ":")
+	fajer := strings.Split(prayer.Fajer, ":")
+	c.AddFunc(fmt.Sprintf("%s %s * * * *", fajer[0], fajer[1]), playAzan)
+	log("new alarm|fajer", fmt.Sprintf("%s %s * * * *", fajer[0], fajer[1]))
 
-  c.AddFunc(fmt.Sprintf("%s %s * * * *", fajer[0], fajer[1]), playAzan)
-  fmt.Printf("[NEW ALARM] %s %s * * * *\n", fajer[0], fajer[1])
+	dohor := strings.Split(prayer.Dohor, ":")
+	c.AddFunc(fmt.Sprintf("%s %s * * * *", dohor[0], dohor[1]), playAzan)
+	log("new alarm|dohor", fmt.Sprintf("%s %s * * * *", dohor[0], dohor[1]))
 
-  c.AddFunc(fmt.Sprintf("%s %s * * * *", dohor[0], dohor[1]), playAzan)
-  fmt.Printf("[NEW ALARM] %s %s * * * *\n", dohor[0], dohor[1])
+	ishaa := strings.Split(prayer.Ishaa, ":")
+	c.AddFunc(fmt.Sprintf("%s %s * * * *", ishaa[0], ishaa[1]), playAzan)
+	log("new alarm|ishaa", fmt.Sprintf("%s %s * * * *", ishaa[0], ishaa[1]))
 
-  c.AddFunc(fmt.Sprintf("%s %s * * * *", ishaa[0], ishaa[1]), playAzan)
-  fmt.Printf("[NEW ALARM] %s %s * * * *\n", ishaa[0], ishaa[1])
-
-  c.AddFunc("0 0 * * * *", func() {
-    fmt.Println("[RESTETTING]")
-    c.Stop()
-    alarmNext()
-  })
+	c.AddFunc("0 0 * * * *", func() {
+		log("RESTETTING", "")
+		c.Stop()
+		alarmNext()
+	})
 
 	c.Start()
 
