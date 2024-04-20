@@ -239,9 +239,9 @@ func alarmNext() string {
 	c.AddFunc(fmt.Sprintf("%s %s * * * *", dohor[0], dohor[1]), playAzan)
 	log("new alarm|dohor", fmt.Sprintf("%s %s * * * *", dohor[0], dohor[1]))
 
-	ishaa := strings.Split(prayer.Ishaa, ":")
-	c.AddFunc(fmt.Sprintf("%s %s * * * *", ishaa[0], ishaa[1]), playAzan)
-	log("new alarm|ishaa", fmt.Sprintf("%s %s * * * *", ishaa[0], ishaa[1]))
+	moghreb := strings.Split(prayer.Moghreb, ":")
+	c.AddFunc(fmt.Sprintf("%s %s * * * *", moghreb[0], moghreb[1]), playAzan)
+	log("new alarm|moghreb", fmt.Sprintf("%s %s * * * *", moghreb[0], moghreb[1]))
 
 	c.AddFunc("0 0 * * * *", func() {
 		log("RESTETTING", "")
