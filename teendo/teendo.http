@@ -1,0 +1,24 @@
+### get item
+GET localhost:{{PORT}}/item/1
+
+### get all items
+GET localhost:{{PORT}}/item
+
+### post item
+POST localhost:{{PORT}}/item
+Content-Type: application/json
+
+{
+    "title": "item 01"
+}
+
+### check an item
+PUT localhost:{{PORT}}/item/1
+Content-Type: application/json
+
+{
+    "checked": true
+}
+
+### delete an item
+DELETE localhost:{{PORT}}/item/1
